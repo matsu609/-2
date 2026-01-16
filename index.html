@@ -1,0 +1,1094 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>波の干渉ビジュアライザー</title>
+    <meta name="description" content="複数波源の干渉をリアルタイムに可視化するデモ。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+:root {
+  --bg-deep: #0b1116;
+  --bg-mid: #142028;
+  --bg-light: #1f3038;
+  --panel-bg: rgba(15, 22, 28, 0.78);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text-main: #f4f2ea;
+  --text-muted: #b4b7b0;
+  --accent-warm: #f6b36a;
+  --accent-cool: #4ec1c6;
+  --accent-strong: #ff8c4b;
+  --shadow: 0 30px 70px rgba(5, 9, 12, 0.45);
+  --radius: 22px;
+  --font-display: "Shippori Mincho B1", serif;
+  --font-body: "Zen Kaku Gothic New", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--text-main);
+  background: var(--bg-deep);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(900px circle at 8% 12%, rgba(246, 179, 106, 0.22), transparent 60%),
+    radial-gradient(720px circle at 92% 20%, rgba(78, 193, 198, 0.22), transparent 55%),
+    radial-gradient(520px circle at 50% 100%, rgba(58, 94, 112, 0.3), transparent 68%),
+    linear-gradient(130deg, #0a0f14, #17232b 55%, #1e2d36);
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(24px, 3vw, 40px) clamp(20px, 4vw, 48px) 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 24px;
+  align-items: center;
+  animation: rise 0.7s ease both;
+}
+
+.hero-text h1 {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 54px);
+  line-height: 1.1;
+  margin: 12px 0 16px;
+  letter-spacing: 0.04em;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  font-size: 0.7rem;
+  color: var(--accent-cool);
+}
+
+.lead {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.hero-card {
+  display: grid;
+  gap: 16px;
+}
+
+.stat {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.stat strong {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.controls {
+  display: grid;
+  gap: 18px;
+  animation: rise 0.7s ease both 0.08s;
+}
+
+.panel-title h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel-title p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.control {
+  display: grid;
+  gap: 10px;
+}
+
+.control label,
+.control .label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+output {
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--text-main);
+  min-width: 70px;
+  text-align: right;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(78, 193, 198, 0.8), rgba(246, 179, 106, 0.85));
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0b1116;
+  border: 2px solid var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(255, 140, 75, 0.25);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0b1116;
+  border: 2px solid var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(255, 140, 75, 0.25);
+  cursor: pointer;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 6px;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label {
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.segmented input:checked + label {
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--text-main);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+button {
+  flex: 1;
+  border: none;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0b1116;
+  background: linear-gradient(130deg, var(--accent-cool), var(--accent-strong));
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+  min-height: 520px;
+  animation: rise 0.7s ease both 0.16s;
+}
+
+.stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.stage-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stage-header p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.canvas-wrap {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0b1116;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.legend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 8px;
+  background: rgba(10, 16, 22, 0.6);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot.warm {
+  background: var(--accent-warm);
+  box-shadow: 0 0 12px rgba(246, 179, 106, 0.8);
+}
+
+.dot.cool {
+  background: var(--accent-cool);
+  box-shadow: 0 0 12px rgba(78, 193, 198, 0.8);
+}
+
+.dot.neutral {
+  background: #8b9096;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.chip strong {
+  color: var(--text-main);
+}
+
+.footer {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(8deg);
+  }
+}
+
+@media (max-width: 980px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .buttons {
+    flex-direction: column;
+  }
+
+  .stage {
+    min-height: 420px;
+  }
+}
+
+</style>
+    
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"></div>
+    <div class="app">
+      <header class="hero">
+        <div class="hero-text">
+          <p class="eyebrow">Wave Interference Lab</p>
+          <h1>波の干渉を、目で感じる。</h1>
+          <p class="lead">
+            複数波源が作る干渉縞をリアルタイムで描画。波源数、波長や位相差を動かして変化を体験できます。
+          </p>
+        </div>
+        <div class="hero-card panel">
+          <div class="stat">
+            <span>操作</span>
+            <strong>スライダー調整 / クリック＆ドラッグで波源移動</strong>
+          </div>
+          <div class="stat">
+            <span>表示</span>
+            <strong>瞬間波形 / 強度分布</strong>
+          </div>
+          <div class="stat">
+            <span>Tips</span>
+            <strong>位相差を180°にすると節が固定されます</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="controls panel">
+          <div class="panel-title">
+            <h2>Wave Controls</h2>
+            <p>物理量は相対値として扱います。</p>
+          </div>
+
+          <div class="control">
+            <label for="wavelength">波長 λ</label>
+            <div class="control-row">
+              <input id="wavelength" type="range" min="40" max="220" value="120" step="1" />
+              <output id="wavelengthValue">120 px</output>
+            </div>
+          </div>
+
+          <div class="control">
+            <label for="sourceCount">波源数 N</label>
+            <div class="control-row">
+              <input id="sourceCount" type="range" min="1" max="8" value="2" step="1" />
+              <output id="sourceCountValue">2個</output>
+            </div>
+            <p class="hint">2以上で波源を横一列に均等配置します。</p>
+          </div>
+
+          <div class="control">
+            <label for="separation">源間距離 d (隣接)</label>
+            <div class="control-row">
+              <input id="separation" type="range" min="40" max="420" value="240" step="1" />
+              <output id="separationValue">240 px</output>
+            </div>
+            <p class="hint">距離を動かすと波源は中央に再配置されます。</p>
+          </div>
+
+          <div class="control">
+            <label for="speed">時間の進み</label>
+            <div class="control-row">
+              <input id="speed" type="range" min="0.2" max="2.8" value="1.2" step="0.1" />
+              <output id="speedValue">1.2x</output>
+            </div>
+          </div>
+
+          <div class="control">
+            <label for="phase">位相差 Δφ (隣接)</label>
+            <div class="control-row">
+              <input id="phase" type="range" min="0" max="360" value="0" step="1" />
+              <output id="phaseValue">0°</output>
+            </div>
+          </div>
+
+          <div class="control">
+            <label for="amplitude">振幅 A</label>
+            <div class="control-row">
+              <input id="amplitude" type="range" min="0.2" max="1.6" value="1" step="0.05" />
+              <output id="amplitudeValue">1.00</output>
+            </div>
+          </div>
+
+          <div class="control">
+            <label for="damping">減衰</label>
+            <div class="control-row">
+              <input id="damping" type="range" min="0" max="0.02" value="0.003" step="0.0005" />
+              <output id="dampingValue">0.003</output>
+            </div>
+          </div>
+
+          <div class="control">
+            <label for="quality">描画品質</label>
+            <div class="control-row">
+              <input id="quality" type="range" min="1" max="5" value="2" step="1" />
+              <output id="qualityValue">2</output>
+            </div>
+            <p class="hint">1が高精細、5が高速。</p>
+          </div>
+
+          <div class="control">
+            <span class="label">表示モード</span>
+            <div class="segmented">
+              <input type="radio" id="modeInstant" name="mode" value="instant" checked />
+              <label for="modeInstant">瞬間波形</label>
+              <input type="radio" id="modeIntensity" name="mode" value="intensity" />
+              <label for="modeIntensity">強度分布</label>
+            </div>
+          </div>
+
+          <div class="buttons">
+            <button id="toggle" type="button">一時停止</button>
+            <button id="reset" type="button" class="ghost">中央に戻す</button>
+          </div>
+        </section>
+
+        <section class="stage panel">
+          <div class="stage-header">
+            <div>
+              <h2>Interference Field</h2>
+              <p>画面の波源をドラッグして位置を変更できます。端のメモリは λ/2 刻みです。</p>
+            </div>
+            <div class="chip">
+              <span>状態</span>
+              <strong id="status">再生中</strong>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="field"></canvas>
+            <div class="legend">
+              <div class="legend-item">
+                <span class="dot warm"></span>
+                <span>正の位相</span>
+              </div>
+              <div class="legend-item">
+                <span class="dot cool"></span>
+                <span>負の位相</span>
+              </div>
+              <div class="legend-item">
+                <span class="dot neutral"></span>
+                <span>節 (打ち消し)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>クリック/ドラッグで波源を移動、スライダーで干渉パターンを探ってください。</p>
+      </footer>
+    </div>
+    <script>
+const canvas = document.getElementById("field");
+const ctx = canvas.getContext("2d");
+const buffer = document.createElement("canvas");
+const bctx = buffer.getContext("2d");
+
+const inputs = {
+  wavelength: document.getElementById("wavelength"),
+  sourceCount: document.getElementById("sourceCount"),
+  separation: document.getElementById("separation"),
+  speed: document.getElementById("speed"),
+  phase: document.getElementById("phase"),
+  amplitude: document.getElementById("amplitude"),
+  damping: document.getElementById("damping"),
+  quality: document.getElementById("quality"),
+};
+
+const outputs = {
+  wavelength: document.getElementById("wavelengthValue"),
+  sourceCount: document.getElementById("sourceCountValue"),
+  separation: document.getElementById("separationValue"),
+  speed: document.getElementById("speedValue"),
+  phase: document.getElementById("phaseValue"),
+  amplitude: document.getElementById("amplitudeValue"),
+  damping: document.getElementById("dampingValue"),
+  quality: document.getElementById("qualityValue"),
+};
+
+const statusText = document.getElementById("status");
+const toggleButton = document.getElementById("toggle");
+const resetButton = document.getElementById("reset");
+
+const state = {
+  wavelength: 120,
+  sourceCount: 2,
+  separation: 240,
+  speed: 1.2,
+  phase: 0,
+  amplitude: 1,
+  damping: 0.003,
+  quality: 2,
+  mode: "instant",
+};
+
+const sources = [
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+];
+
+function ensureSourceCount(count) {
+  const safeCount = Math.max(1, Math.round(count));
+  while (sources.length < safeCount) {
+    sources.push({ x: 0, y: 0 });
+  }
+  if (sources.length > safeCount) {
+    sources.length = safeCount;
+  }
+}
+
+const gradients = {
+  positive: buildGradient(
+    [
+      { t: 0, color: [10, 18, 28] },
+      { t: 1, color: [246, 179, 106] },
+    ],
+    256
+  ),
+  negative: buildGradient(
+    [
+      { t: 0, color: [10, 18, 28] },
+      { t: 1, color: [78, 193, 198] },
+    ],
+    256
+  ),
+  intensity: buildGradient(
+    [
+      { t: 0, color: [10, 18, 28] },
+      { t: 0.45, color: [62, 126, 154] },
+      { t: 0.75, color: [235, 200, 140] },
+      { t: 1, color: [224, 96, 70] },
+    ],
+    256
+  ),
+};
+
+let imageData = null;
+let time = 0;
+let lastTime = performance.now();
+let running = true;
+let dragIndex = null;
+
+function buildGradient(stops, size) {
+  const data = new Uint8Array(size * 3);
+  for (let i = 0; i < size; i += 1) {
+    const t = i / (size - 1);
+    let s = 0;
+    while (s < stops.length - 1 && t > stops[s + 1].t) {
+      s += 1;
+    }
+    const start = stops[s];
+    const end = stops[Math.min(s + 1, stops.length - 1)];
+    const localT = end.t === start.t ? 0 : (t - start.t) / (end.t - start.t);
+    const r = Math.round(lerp(start.color[0], end.color[0], localT));
+    const g = Math.round(lerp(start.color[1], end.color[1], localT));
+    const b = Math.round(lerp(start.color[2], end.color[2], localT));
+    const idx = i * 3;
+    data[idx] = r;
+    data[idx + 1] = g;
+    data[idx + 2] = b;
+  }
+  return data;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function updateOutputs() {
+  outputs.wavelength.textContent = `${Math.round(state.wavelength)} px`;
+  outputs.sourceCount.textContent = `${state.sourceCount}個`;
+  outputs.separation.textContent = `${Math.round(state.separation)} px`;
+  outputs.speed.textContent = `${state.speed.toFixed(1)}x`;
+  outputs.phase.textContent = `${Math.round(state.phase)}°`;
+  outputs.amplitude.textContent = state.amplitude.toFixed(2);
+  outputs.damping.textContent = state.damping.toFixed(4);
+  outputs.quality.textContent = `${state.quality}`;
+}
+
+function layoutSources() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  const cx = width / 2;
+  const cy = height / 2;
+  const count = sources.length;
+  if (count === 0) {
+    return;
+  }
+  if (count === 1) {
+    sources[0].x = cx;
+    sources[0].y = cy;
+    return;
+  }
+  const spacing = state.separation;
+  const total = spacing * (count - 1);
+  const startX = cx - total / 2;
+  sources.forEach((source, index) => {
+    source.x = startX + spacing * index;
+    source.y = cy;
+  });
+}
+
+function updateSeparationLimit() {
+  const width = canvas.clientWidth;
+  if (!width) {
+    return;
+  }
+  const minSeparation = parseFloat(inputs.separation.min);
+  const count = sources.length;
+  let maxSpacing = width * 0.9;
+  if (count > 1) {
+    maxSpacing /= count - 1;
+  }
+  maxSpacing = Math.max(minSeparation, Math.floor(maxSpacing));
+  inputs.separation.max = maxSpacing;
+  if (state.separation > maxSpacing) {
+    state.separation = maxSpacing;
+    inputs.separation.value = state.separation.toFixed(0);
+  }
+}
+
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  updateSeparationLimit();
+
+  buffer.width = Math.max(1, Math.floor(rect.width / state.quality));
+  buffer.height = Math.max(1, Math.floor(rect.height / state.quality));
+  imageData = bctx.createImageData(buffer.width, buffer.height);
+  layoutSources();
+  updateOutputs();
+}
+
+function drawField() {
+  const width = buffer.width;
+  const height = buffer.height;
+  const scale = state.quality;
+  const data = imageData.data;
+  const waveNumber = (Math.PI * 2) / state.wavelength;
+  const phaseStep = (state.phase * Math.PI) / 180;
+  const baseAmplitude = state.amplitude;
+  const damping = state.damping;
+  const mode = state.mode;
+  const count = sources.length;
+  const maxAmplitude = baseAmplitude * count;
+  const maxIntensity = 0.5 * baseAmplitude * baseAmplitude * count * count;
+
+  let idx = 0;
+  for (let y = 0; y < height; y += 1) {
+    const py = y * scale;
+    for (let x = 0; x < width; x += 1) {
+      const px = x * scale;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+
+      if (mode === "instant") {
+        let value = 0;
+        for (let i = 0; i < count; i += 1) {
+          const src = sources[i];
+          const dx = px - src.x;
+          const dy = py - src.y;
+          const rDist = Math.hypot(dx, dy) + 0.0001;
+          const amplitude = baseAmplitude / (1 + damping * rDist);
+          const phase = waveNumber * rDist + phaseStep * i;
+          value += amplitude * Math.sin(phase - Math.PI * 2 * time);
+        }
+        const normalized = clamp(Math.abs(value) / maxAmplitude, 0, 1);
+        const lookup = value >= 0 ? gradients.positive : gradients.negative;
+        const gradIndex = Math.floor(normalized * 255) * 3;
+        r = lookup[gradIndex];
+        g = lookup[gradIndex + 1];
+        b = lookup[gradIndex + 2];
+      } else {
+        let real = 0;
+        let imag = 0;
+        for (let i = 0; i < count; i += 1) {
+          const src = sources[i];
+          const dx = px - src.x;
+          const dy = py - src.y;
+          const rDist = Math.hypot(dx, dy) + 0.0001;
+          const amplitude = baseAmplitude / (1 + damping * rDist);
+          const phase = waveNumber * rDist + phaseStep * i;
+          real += amplitude * Math.cos(phase);
+          imag += amplitude * Math.sin(phase);
+        }
+        const intensity = 0.5 * (real * real + imag * imag);
+        const normalized = clamp(intensity / maxIntensity, 0, 1);
+        const gradIndex = Math.floor(normalized * 255) * 3;
+        r = gradients.intensity[gradIndex];
+        g = gradients.intensity[gradIndex + 1];
+        b = gradients.intensity[gradIndex + 2];
+      }
+
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = 255;
+      idx += 4;
+    }
+  }
+
+  bctx.putImageData(imageData, 0, 0);
+  const widthCss = canvas.clientWidth;
+  const heightCss = canvas.clientHeight;
+  ctx.clearRect(0, 0, widthCss, heightCss);
+  ctx.drawImage(buffer, 0, 0, widthCss, heightCss);
+  drawScale();
+  drawSources();
+}
+
+function drawScale() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  const tickSpacing = state.wavelength / 2;
+  if (!Number.isFinite(tickSpacing) || tickSpacing <= 0) {
+    return;
+  }
+
+  const minorLen = 6;
+  const majorLen = 12;
+  const labelInset = 18;
+  const minLabelSpacing = 80;
+  let labelEvery = Math.max(2, Math.round(minLabelSpacing / tickSpacing));
+  if (labelEvery % 2 !== 0) {
+    labelEvery += 1;
+  }
+
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+  ctx.font = "11px \"Zen Kaku Gothic New\", sans-serif";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 4;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i = 0; ; i += 1) {
+    const x = i * tickSpacing;
+    if (x > width) {
+      break;
+    }
+    const len = i % 2 === 0 ? majorLen : minorLen;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, len);
+    ctx.stroke();
+    if (i % labelEvery === 0 && x > labelInset && x < width - labelInset) {
+      ctx.fillText(`${(i / 2).toFixed(0)}λ`, x, labelInset);
+    }
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  for (let i = 0; ; i += 1) {
+    const y = i * tickSpacing;
+    if (y > height) {
+      break;
+    }
+    const len = i % 2 === 0 ? majorLen : minorLen;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(len, y);
+    ctx.stroke();
+    if (i % labelEvery === 0 && y > labelInset && y < height - labelInset) {
+      ctx.fillText(`${(i / 2).toFixed(0)}λ`, labelInset, y);
+    }
+  }
+
+  ctx.restore();
+}
+
+function getSourceColor(index) {
+  if (sources.length === 1) {
+    return "rgba(246, 179, 106, 0.95)";
+  }
+  const t = index / (sources.length - 1);
+  const r = Math.round(lerp(246, 78, t));
+  const g = Math.round(lerp(179, 193, t));
+  const b = Math.round(lerp(106, 198, t));
+  return `rgba(${r}, ${g}, ${b}, 0.95)`;
+}
+
+function drawSources() {
+  sources.forEach((source, index) => {
+    const color = getSourceColor(index);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(source.x, source.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function tick(now) {
+  const delta = (now - lastTime) / 1000;
+  lastTime = now;
+  if (running) {
+    time += delta * state.speed;
+  }
+  drawField();
+  requestAnimationFrame(tick);
+}
+
+function getPointerPosition(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: clamp(event.clientX - rect.left, 0, rect.width),
+    y: clamp(event.clientY - rect.top, 0, rect.height),
+  };
+}
+
+function nearestSourceIndex(pos) {
+  let nearestIndex = 0;
+  let nearestDistance = Infinity;
+  sources.forEach((source, index) => {
+    const distance = Math.hypot(pos.x - source.x, pos.y - source.y);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = index;
+    }
+  });
+  return nearestIndex;
+}
+
+function updateSeparationFromSources() {
+  if (sources.length < 2) {
+    return;
+  }
+  let total = 0;
+  for (let i = 0; i < sources.length - 1; i += 1) {
+    total += Math.hypot(
+      sources[i + 1].x - sources[i].x,
+      sources[i + 1].y - sources[i].y
+    );
+  }
+  const distance = total / (sources.length - 1);
+  const maxSeparation = parseFloat(inputs.separation.max);
+  state.separation = clamp(distance, parseFloat(inputs.separation.min), maxSeparation);
+  inputs.separation.value = state.separation.toFixed(0);
+  updateOutputs();
+}
+
+inputs.wavelength.addEventListener("input", (event) => {
+  state.wavelength = parseFloat(event.target.value);
+  updateOutputs();
+});
+
+inputs.sourceCount.addEventListener("input", (event) => {
+  state.sourceCount = Math.max(1, parseInt(event.target.value, 10));
+  ensureSourceCount(state.sourceCount);
+  updateSeparationLimit();
+  layoutSources();
+  updateOutputs();
+});
+
+inputs.separation.addEventListener("input", (event) => {
+  state.separation = parseFloat(event.target.value);
+  layoutSources();
+  updateOutputs();
+});
+
+inputs.speed.addEventListener("input", (event) => {
+  state.speed = parseFloat(event.target.value);
+  updateOutputs();
+});
+
+inputs.phase.addEventListener("input", (event) => {
+  state.phase = parseFloat(event.target.value);
+  updateOutputs();
+});
+
+inputs.amplitude.addEventListener("input", (event) => {
+  state.amplitude = parseFloat(event.target.value);
+  updateOutputs();
+});
+
+inputs.damping.addEventListener("input", (event) => {
+  state.damping = parseFloat(event.target.value);
+  updateOutputs();
+});
+
+inputs.quality.addEventListener("input", (event) => {
+  state.quality = parseInt(event.target.value, 10);
+  resize();
+});
+
+const modeRadios = document.querySelectorAll('input[name="mode"]');
+modeRadios.forEach((radio) => {
+  radio.addEventListener("change", (event) => {
+    state.mode = event.target.value;
+  });
+});
+
+toggleButton.addEventListener("click", () => {
+  running = !running;
+  toggleButton.textContent = running ? "一時停止" : "再生";
+  statusText.textContent = running ? "再生中" : "停止中";
+});
+
+resetButton.addEventListener("click", () => {
+  layoutSources();
+  updateSeparationFromSources();
+});
+
+canvas.addEventListener("pointerdown", (event) => {
+  const pos = getPointerPosition(event);
+  dragIndex = nearestSourceIndex(pos);
+  sources[dragIndex].x = pos.x;
+  sources[dragIndex].y = pos.y;
+  updateSeparationFromSources();
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (dragIndex === null) {
+    return;
+  }
+  const pos = getPointerPosition(event);
+  sources[dragIndex].x = pos.x;
+  sources[dragIndex].y = pos.y;
+  updateSeparationFromSources();
+});
+
+function releasePointer(event) {
+  if (dragIndex === null) {
+    return;
+  }
+  dragIndex = null;
+  if (canvas.hasPointerCapture(event.pointerId)) {
+    canvas.releasePointerCapture(event.pointerId);
+  }
+}
+
+canvas.addEventListener("pointerup", releasePointer);
+canvas.addEventListener("pointerleave", releasePointer);
+canvas.addEventListener("pointercancel", releasePointer);
+
+window.addEventListener("resize", () => {
+  resize();
+});
+
+ensureSourceCount(state.sourceCount);
+updateOutputs();
+resize();
+requestAnimationFrame(tick);
+
+  </script>
+</body>
+</html>
